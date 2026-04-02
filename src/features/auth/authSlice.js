@@ -23,6 +23,10 @@ const authSlice = createSlice({
         state.loading = false;
         state.token = action.payload?.token ?? null;
         state.isAuthenticated = Boolean(state.token);
+        const role = action.payload?.role ?? null;
+        if (role) {
+          state.user = { ...(state.user ?? {}), ...(action.payload?.user ?? {}), role };
+        }
       })
       .addCase(restoreSession.rejected, (state) => {
         state.loading = false;
@@ -47,7 +51,9 @@ const authSlice = createSlice({
       .addCase(verifyOtp.fulfilled, (state, action) => {
         state.loading = false;
         state.token = action.payload?.accessToken ?? null;
-        state.user = action.payload?.user ?? null;
+        const baseUser = action.payload?.user ?? null;
+        const role = action.payload?.role ?? null;
+        state.user = baseUser ? { ...baseUser, ...(role ? { role } : {}) } : null;
         state.isAuthenticated = Boolean(state.token);
       })
       .addCase(verifyOtp.rejected, (state, action) => {

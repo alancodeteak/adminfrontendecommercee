@@ -2,6 +2,23 @@ import { createAsyncThunk } from "@reduxjs/toolkit";
 import * as authService from "./authService.js";
 import { getToken, removeToken, setToken } from "../../utils/tokenStorage.js";
 
+function decodeJwtPayload(token) {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const base64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join("")
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 export const requestOtp = createAsyncThunk(
   "auth/requestOtp",
   async ({ email }, { rejectWithValue }) => {
@@ -33,8 +50,12 @@ export const verifyOtp = createAsyncThunk(
 export const restoreSession = createAsyncThunk("auth/restoreSession", async () => {
   const token = getToken();
   if (!token) return { token: null };
-  // We only have a token in storage; user can be fetched later if needed.
-  return { token };
+  const payload = decodeJwtPayload(token);
+  return {
+    token,
+    user: payload?.sub ? { id: payload.sub } : null,
+    role: payload?.role ?? null
+  };
 });
 
 export const logoutUser = createAsyncThunk("auth/logoutUser", async () => {
