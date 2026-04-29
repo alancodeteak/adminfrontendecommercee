@@ -26,6 +26,11 @@ function parseBackendErrors(err) {
   const message = err?.response?.data?.error?.message || err?.message || "Failed to update shop";
   const details = err?.response?.data?.error?.details;
   const fieldErrors = {};
+  const rawMessage = String(message || "");
+  const isDomainConflict =
+    err?.response?.status === 409 &&
+    /domain/i.test(rawMessage) &&
+    /(already exists|duplicate|unique|conflict)/i.test(rawMessage);
   const issues = details?.issues || details?.cause?.issues || details?.errors;
   if (Array.isArray(issues)) {
     for (const issue of issues) {
@@ -34,7 +39,13 @@ function parseBackendErrors(err) {
       fieldErrors[String(path)] = issue.message || "Invalid value";
     }
   }
-  return { message, fieldErrors };
+  if (isDomainConflict || /domain.*(already exists|duplicate|unique)/i.test(rawMessage)) {
+    fieldErrors.domain = "Shop domain already exists";
+  }
+  return {
+    message: fieldErrors.domain ? "Shop domain already exists" : message,
+    fieldErrors
+  };
 }
 
 export function EditShopPage() {
@@ -48,10 +59,13 @@ export function EditShopPage() {
   const [mapOpen, setMapOpen] = useState(false);
 
   const [slug, setSlug] = useState("");
+  const [publicId, setPublicId] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [customDomain, setCustomDomain] = useState("");
+  const [domain, setDomain] = useState("");
+  const [serviceAreaRadiusMeters, setServiceAreaRadiusMeters] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [status, setStatus] = useState("active");
@@ -88,10 +102,15 @@ export function EditShopPage() {
         const s = res.data?.data?.shop;
         if (cancelled || !s) return;
         setSlug(s.slug || "");
+        setPublicId(s.publicId || "");
         setName(s.name || "");
         setPhone(s.phone || "");
         setEmail(s.email || "");
         setCustomDomain(s.customDomain || "");
+        setDomain(s.domain || "");
+        setServiceAreaRadiusMeters(
+          s.serviceAreaRadiusMeters != null ? String(s.serviceAreaRadiusMeters) : ""
+        );
         setOwnerUserId(s.ownerUserId || "");
         setIsActive(Boolean(s.isActive));
         setStatus(s.status || "active");
@@ -131,6 +150,12 @@ export function EditShopPage() {
     if (!finalSlug) next.slug = "Slug is required";
     if (finalSlug.length > 64) next.slug = "Slug must be 64 characters or less";
     if (finalSlug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(finalSlug)) next.slug = "Invalid slug format";
+    if (publicId.trim() && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(publicId.trim())) {
+      next.publicId = "Invalid public id format";
+    }
+    if (publicId.trim() && (publicId.trim().length < 3 || publicId.trim().length > 128)) {
+      next.publicId = "Public ID must be 3-128 characters";
+    }
     if (phone.trim() && !/^[0-9+][0-9]{7,31}$/.test(phone.trim())) next.phone = "Invalid phone format";
     if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = "Invalid email";
     if (
@@ -138,6 +163,20 @@ export function EditShopPage() {
       !/^[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i.test(customDomain.trim())
     ) {
       next.customDomain = "Invalid domain format";
+    }
+    if (domain.trim().length > 255) next.domain = "Domain must be 255 characters or less";
+    if (
+      domain.trim() &&
+      !/^[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i.test(domain.trim())
+    ) {
+      next.domain = "Invalid domain format";
+    }
+    let radiusMetersV;
+    if (serviceAreaRadiusMeters.trim()) {
+      radiusMetersV = Number(serviceAreaRadiusMeters);
+      if (!Number.isInteger(radiusMetersV) || radiusMetersV < 1) {
+        next.serviceAreaRadiusMeters = "Service radius must be an integer of at least 1 meter";
+      }
     }
     if (ownerUserId.trim() && !/^[0-9a-f-]{36}$/i.test(ownerUserId.trim())) {
       next.ownerUserId = "Invalid UUID";
@@ -152,13 +191,13 @@ export function EditShopPage() {
     } else if (latV !== null && (latV < -90 || latV > 90)) next.lat = "Latitude must be between -90 and 90";
     else if (lngV !== null && (lngV < -180 || lngV > 180)) next.lng = "Longitude must be between -180 and 180";
     setErrors(next);
-    return { ok: Object.keys(next).length === 0, finalSlug, latV, lngV };
+    return { ok: Object.keys(next).length === 0, finalSlug, latV, lngV, radiusMetersV };
   }
 
   async function onSubmit(e) {
     e.preventDefault();
     setFormError(null);
-    const { ok, finalSlug, latV, lngV } = validateClient();
+    const { ok, finalSlug, latV, lngV, radiusMetersV } = validateClient();
     if (!ok) return;
 
     const address = {
@@ -179,9 +218,12 @@ export function EditShopPage() {
       await api.patch(`/api/superadmin/shops/${id}`, {
         name: name.trim(),
         slug: finalSlug,
+        publicId: publicId.trim() ? publicId.trim() : null,
         phone: phone.trim() ? phone.trim() : null,
         email: email.trim() ? email.trim() : null,
         customDomain: customDomain.trim() ? customDomain.trim() : null,
+        domain: domain.trim() ? domain.trim() : null,
+        serviceAreaRadiusMeters: radiusMetersV,
         ownerUserId: ownerUserId.trim() ? ownerUserId.trim() : null,
         isActive,
         status,
@@ -252,6 +294,14 @@ export function EditShopPage() {
             <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} error={errors.slug} name="slug" />
           </div>
 
+          <Input
+            label="Public ID"
+            value={publicId}
+            onChange={(e) => setPublicId(normalizeSlug(e.target.value))}
+            error={errors.publicId}
+            name="publicId"
+          />
+
           <div className="grid gap-4 sm:grid-cols-2">
             <Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} error={errors.phone} name="phone" />
             <Input label="Email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} name="email" />
@@ -264,6 +314,26 @@ export function EditShopPage() {
             error={errors.customDomain}
             name="customDomain"
           />
+          <Input
+            label="Domain (optional)"
+            value={domain}
+            onChange={(e) => setDomain(e.target.value)}
+            placeholder="shop.example.com"
+            error={errors.domain}
+            name="domain"
+          />
+          <div>
+            <Input
+              label="Service Radius (meters) (optional)"
+              type="number"
+              value={serviceAreaRadiusMeters}
+              onChange={(e) => setServiceAreaRadiusMeters(e.target.value)}
+              placeholder="e.g. 5000 meters"
+              error={errors.serviceAreaRadiusMeters}
+              name="serviceAreaRadiusMeters"
+            />
+            <p className="mt-1 text-xs text-slate-500">Enter service radius in meters</p>
+          </div>
 
           <Input
             label="Owner user ID (UUID)"

@@ -123,6 +123,10 @@ export function ShopDetailPage() {
               <DetailRow label="Blocked">{shop.isBlocked ? "Yes" : "No"}</DetailRow>
               <DetailRow label="Deleted">{shop.isDeleted ? "Yes" : "No"}</DetailRow>
               <DetailRow label="Custom domain">{shop.customDomain || "—"}</DetailRow>
+              <DetailRow label="Domain">{shop.domain || "—"}</DetailRow>
+              <DetailRow label="Service radius">
+                {shop.serviceAreaRadiusMeters != null ? `${shop.serviceAreaRadiusMeters} meters` : "—"}
+              </DetailRow>
               <DetailRow label="Owner user ID">
                 {shop.ownerUserId ? <span className="font-mono text-xs">{shop.ownerUserId}</span> : "—"}
               </DetailRow>

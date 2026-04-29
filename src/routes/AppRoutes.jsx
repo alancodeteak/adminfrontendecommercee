@@ -6,6 +6,7 @@ import { ShopsPage } from "../pages/ShopsPage.jsx";
 import { CreateShopPage } from "../pages/CreateShopPage.jsx";
 import { ShopDetailPage } from "../pages/ShopDetailPage.jsx";
 import { EditShopPage } from "../pages/EditShopPage.jsx";
+import { ProductIntakePage } from "../pages/ProductIntakePage.jsx";
 import { selectIsAuthenticated } from "../features/auth/authSelectors.js";
 import { DashboardLayout } from "../components/layout/DashboardLayout.jsx";
 
@@ -42,6 +43,7 @@ export function AppRoutes() {
       >
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/shops" element={<ShopsPage />} />
+        <Route path="/products" element={<ProductIntakePage />} />
         <Route path="/shops/new" element={<CreateShopPage />} />
         <Route path="/shops/:id/edit" element={<EditShopPage />} />
         <Route path="/shops/:id" element={<ShopDetailPage />} />

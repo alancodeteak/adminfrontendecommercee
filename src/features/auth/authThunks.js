@@ -1,6 +1,6 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import * as authService from "./authService.js";
-import { getToken, removeToken, setToken } from "../../utils/tokenStorage.js";
+import { clearAuthSession, getToken, setToken } from "../../utils/tokenStorage.js";
 
 function decodeJwtPayload(token) {
   try {
@@ -59,7 +59,7 @@ export const restoreSession = createAsyncThunk("auth/restoreSession", async () =
 });
 
 export const logoutUser = createAsyncThunk("auth/logoutUser", async () => {
-  removeToken();
+  clearAuthSession();
   return true;
 });
 

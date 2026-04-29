@@ -4,13 +4,6 @@ import { useAuth } from "../hooks/useAuth.js";
 import { api } from "../api/axios.js";
 import { Card } from "../components/ui/Card.jsx";
 
-/** Placeholder metrics until orders APIs exist. */
-const DEMO_ORDER_STATS = [
-  { key: "orders-total", label: "Total orders", value: "1,248", hint: "All time (sample)" },
-  { key: "orders-pending", label: "Pending orders", value: "42", hint: "Awaiting fulfillment (sample)" },
-  { key: "orders-completed", label: "Completed (30d)", value: "892", hint: "Last 30 days (sample)" }
-];
-
 function StatCard({ label, value, hint, footer, to, accent = "indigo" }) {
   const accentRing =
     accent === "emerald"
@@ -43,31 +36,31 @@ export function DashboardPage() {
   const { user, logout } = useAuth();
   const isSuperadmin = user?.role === "superadmin";
 
-  const [shopTotal, setShopTotal] = useState(null);
-  const [shopsLoading, setShopsLoading] = useState(false);
-  const [shopsError, setShopsError] = useState(null);
+  const [metrics, setMetrics] = useState(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [metricsError, setMetricsError] = useState(null);
 
   useEffect(() => {
     if (!isSuperadmin) {
-      setShopTotal(null);
-      setShopsError(null);
+      setMetrics(null);
+      setMetricsError(null);
       return;
     }
     let cancelled = false;
     async function load() {
-      setShopsLoading(true);
-      setShopsError(null);
+      setMetricsLoading(true);
+      setMetricsError(null);
       try {
-        const res = await api.get("/api/superadmin/shops?page=1&limit=1");
-        const total = res.data?.data?.pagination?.total;
-        if (!cancelled) setShopTotal(typeof total === "number" ? total : 0);
+        const res = await api.get("/api/superadmin/platform-metrics");
+        const data = res.data?.data;
+        if (!cancelled) setMetrics(data || null);
       } catch (e) {
         if (!cancelled) {
-          setShopTotal(null);
-          setShopsError(e?.response?.data?.error?.message || e?.message || "Could not load shops");
+          setMetrics(null);
+          setMetricsError(e?.response?.data?.error?.message || e?.message || "Could not load dashboard metrics");
         }
       } finally {
-        if (!cancelled) setShopsLoading(false);
+        if (!cancelled) setMetricsLoading(false);
       }
     }
     load();
@@ -76,12 +69,44 @@ export function DashboardPage() {
     };
   }, [isSuperadmin]);
 
-  const shopValue =
-    !isSuperadmin ? "—" : shopsLoading ? "…" : shopsError ? "—" : String(shopTotal ?? 0);
+  const shopValue = !isSuperadmin ? "—" : metricsLoading ? "…" : metricsError ? "—" : String(metrics?.shopsTotal ?? 0);
+  const ordersTotalValue = !isSuperadmin
+    ? "—"
+    : metricsLoading
+      ? "…"
+      : metricsError
+        ? "—"
+        : String(metrics?.ordersTotal ?? 0);
+  const ordersPendingValue = !isSuperadmin
+    ? "—"
+    : metricsLoading
+      ? "…"
+      : metricsError
+        ? "—"
+        : String(metrics?.ordersPending ?? 0);
+  const ordersDelivered30dValue = !isSuperadmin
+    ? "—"
+    : metricsLoading
+      ? "…"
+      : metricsError
+        ? "—"
+        : String(metrics?.ordersDelivered30d ?? 0);
+  const revenueMinor30dValue = !isSuperadmin
+    ? "—"
+    : metricsLoading
+      ? "…"
+      : metricsError
+        ? "—"
+        : new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency: metrics?.currency || "INR",
+            maximumFractionDigits: 0
+          }).format((Number(metrics?.revenueMinor30d ?? 0) || 0) / 100);
+
   const shopHint = !isSuperadmin
     ? "Shop totals are available for superadmin accounts."
-    : shopsError
-      ? shopsError
+    : metricsError
+      ? metricsError
       : "Registered shops on the platform";
 
   return (
@@ -128,21 +153,38 @@ export function DashboardPage() {
           />
         </Card>
 
-        {DEMO_ORDER_STATS.map((s, i) => (
-          <Card key={s.key} className="relative overflow-hidden p-0">
-            <StatCard
-              label={s.label}
-              value={s.value}
-              hint={s.hint}
-              accent={i === 0 ? "emerald" : i === 1 ? "amber" : "indigo"}
-              footer={
-                <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                  Demo
-                </span>
-              }
-            />
-          </Card>
-        ))}
+        <Card className="relative overflow-hidden p-0">
+          <StatCard
+            label="Total orders"
+            value={ordersTotalValue}
+            hint={isSuperadmin ? "All-time orders across shops" : "Available for superadmin accounts"}
+            accent="emerald"
+          />
+        </Card>
+        <Card className="relative overflow-hidden p-0">
+          <StatCard
+            label="Pending orders"
+            value={ordersPendingValue}
+            hint={isSuperadmin ? "Orders awaiting fulfillment" : "Available for superadmin accounts"}
+            accent="amber"
+          />
+        </Card>
+        <Card className="relative overflow-hidden p-0">
+          <StatCard
+            label="Delivered (30d)"
+            value={ordersDelivered30dValue}
+            hint={isSuperadmin ? "Delivered orders in last 30 days" : "Available for superadmin accounts"}
+            accent="indigo"
+          />
+        </Card>
+        <Card className="relative overflow-hidden p-0">
+          <StatCard
+            label="Revenue (30d)"
+            value={revenueMinor30dValue}
+            hint={isSuperadmin ? "Sum of order totals in last 30 days" : "Available for superadmin accounts"}
+            accent="emerald"
+          />
+        </Card>
       </div>
     </div>
   );

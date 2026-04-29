@@ -34,7 +34,6 @@ export function LoginPage() {
   async function onSendOtp(e) {
     e.preventDefault();
     if (!SUPERADMIN_EMAIL) {
-      // eslint-disable-next-line no-alert
       alert("Missing VITE_SUPERADMIN_EMAIL. Add it to frontend/.env and restart the dev server.");
       return;
     }

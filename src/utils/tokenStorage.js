@@ -13,3 +13,14 @@ export function removeToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+export function clearAuthSession() {
+  removeToken();
+  for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+    const key = localStorage.key(i);
+    if (key?.startsWith("auth.")) {
+      localStorage.removeItem(key);
+    }
+  }
+  sessionStorage.clear();
+}
+
